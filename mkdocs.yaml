@@ -1,0 +1,5 @@
+site_name: "Terraform Cloud Run for demo-test-1"
+site_description: "This is a Terraform module for deploying docker image using Cloud Run. Demo test application"
+
+nav:
+  - Introduction: index.md

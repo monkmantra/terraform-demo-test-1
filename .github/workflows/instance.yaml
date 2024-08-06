@@ -1,0 +1,74 @@
+name: Deploy Cloud Run
+
+on:
+  workflow_call:
+  repository_dispatch:
+
+env:
+  APP_NAME: demo-test-1
+  GCP_PROJECT_ID: png-gcp-learning-poc
+  DB_NAME: demotest1
+  COST_CENTER: 123123
+  IRISK_ID: 123123
+
+
+jobs:
+  deploy-cloudrun:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    
+    # checkout the code from the repository
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: configure gcp credentials
+      uses: google-github-actions/auth@v1
+      with:
+        workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+        service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+  
+    - name: Configure Docker
+      run: gcloud --quiet auth configure-docker
+
+    # Initialize Terraform 
+    - name: Terraform Init
+      run: terraform init
+      working-directory: .  # Where should this command be run?
+      
+    # Format Terraform code
+    - name: Terraform Format
+      run: terraform fmt
+      working-directory: .
+      
+    # Validate the Terraform code 
+    - name: Terraform Validate
+      run: terraform validate
+      working-directory: .
+
+    - name: Terraform Plan
+      run: terraform plan -out tf.plan
+      working-directory: .
+      
+    # Apply the Terraform plan
+    - name: Terraform Apply
+      run: terraform apply tf.plan
+      working-directory: .
+    
+    - name: Insert data in Spanner database
+      run: |
+        gcloud spanner databases execute-sql ${{ env.DB_NAME }} --instance=appdb --sql="INSERT tasks(title, status) VALUES('Create Backstage environment','Completed')"
+        gcloud spanner databases execute-sql ${{ env.DB_NAME }} --instance=appdb --sql="INSERT tasks(title, status) VALUES('Create Application Templates','Completed')"
+        gcloud spanner databases execute-sql ${{ env.DB_NAME }} --instance=appdb --sql="INSERT tasks(title, status) VALUES('Create Terraform Templates','Completed')"
+        gcloud spanner databases execute-sql ${{ env.DB_NAME }} --instance=appdb --sql="INSERT tasks(title, status) VALUES('Create demo presentation','Pending')"
+        gcloud spanner databases execute-sql ${{ env.DB_NAME }} --instance=appdb --sql="INSERT tasks(title, status) VALUES('Actual demo','Pending')"
+    
+    # Update cloud run with latest image
+    - name: Update Cloud Run
+      run: |
+        gcloud run deploy ${{ env.APP_NAME }} --image "us-east4-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/python-fastapi/${{ env.APP_NAME }}:latest" --update-labels "environment"="development","app_type"="fastapi","cost_center"="${{ env.COST_CENTER }}","irisk_id"="${{ env.IRISK_ID }}","app_name"="${{ env.APP_NAME }}" --region "us-east4" --project ${{ env.GCP_PROJECT_ID }}
+  

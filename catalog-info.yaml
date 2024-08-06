@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: infra-demo-test-1
+  annotations:
+    "backstage.io/project": "png-gcp-learning-poc"
+    "backstage.io/cloud-run": "demo-test-1"
+    backstage.io/techdocs-ref: dir:.
+spec:
+  type: service
+  owner: user:de-ims
+  lifecycle: experimental
